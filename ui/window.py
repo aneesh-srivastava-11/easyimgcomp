@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         mode = self.mode_panel.selected_mode()
         quality = self.mode_panel.quality()
         oxipng_speed = self.mode_panel.oxipng_speed()
+        webp_rename = self.mode_panel.webp_rename_to_jpg()
         behavior = self.output_selector.selected_behavior()
         custom_folder = self.output_selector.custom_folder()
 
@@ -73,6 +74,7 @@ class MainWindow(QMainWindow):
             behavior,
             custom_folder,
             oxipng_speed,
+            webp_rename,
         )
         self._thread.progress.connect(self.results_panel.set_progress)
         self._thread.file_result.connect(self._on_file_result)
