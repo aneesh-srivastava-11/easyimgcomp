@@ -33,6 +33,7 @@ class CompressionThread(QThread):
         output_behavior: OutputBehavior,
         output_dir: str,
         oxipng_speed: int = 3,
+        webp_rename_to_jpg: bool = False,
     ):
         super().__init__()
         self.folders = folders
@@ -42,6 +43,7 @@ class CompressionThread(QThread):
         self.output_behavior = output_behavior
         self.output_dir = output_dir
         self.oxipng_speed = oxipng_speed
+        self.webp_rename_to_jpg = webp_rename_to_jpg
         self._cancel_event = threading.Event()
 
     def cancel(self):
@@ -112,6 +114,9 @@ class CompressionThread(QThread):
     def _resolve_output(self, filepath: str, strategy) -> tuple[str, bool]:
         base, _ = os.path.splitext(filepath)
         ext = strategy.output_extension()
+
+        if self.webp_rename_to_jpg and ext == ".webp":
+            ext = ".jpg"
 
         if (
             self.output_behavior == OutputBehavior.CUSTOM_FOLDER
