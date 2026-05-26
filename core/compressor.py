@@ -66,7 +66,9 @@ class CompressionThread(QThread):
             for filepath in files:
                 if self._cancel_event.is_set():
                     break
-                output_path, should_delete = self._resolve_output(filepath, strategy)
+                output_path, should_delete = self._resolve_output(
+                    filepath, strategy
+                )
                 futures[
                     executor.submit(
                         self._process_one,
@@ -103,7 +105,10 @@ class CompressionThread(QThread):
         base, _ = os.path.splitext(filepath)
         ext = strategy.output_extension()
 
-        if self.output_behavior == OutputBehavior.CUSTOM_FOLDER and self.output_dir:
+        if (
+            self.output_behavior == OutputBehavior.CUSTOM_FOLDER
+            and self.output_dir
+        ):
             rel = os.path.relpath(
                 filepath,
                 os.path.commonpath(self.folders)
@@ -153,5 +158,9 @@ class CompressionThread(QThread):
             )
         except Exception as e:
             return FileResult(
-                filepath=filepath, before=0, after=0, success=False, error=str(e)
+                filepath=filepath,
+                before=0,
+                after=0,
+                success=False,
+                error=str(e),
             )

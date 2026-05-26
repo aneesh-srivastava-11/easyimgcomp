@@ -1,9 +1,8 @@
 import os
-import subprocess
 import threading
-import time
 from enum import Enum
 from PIL import Image
+import oxipng
 
 
 class Mode(Enum):
@@ -19,11 +18,7 @@ class OutputBehavior(Enum):
 
 
 def _oxipng_available() -> bool:
-    try:
-        import oxipng
-        return True
-    except ImportError:
-        return False
+    return hasattr(oxipng, "optimize")
 
 
 class OxiPNGStrategy:
@@ -37,17 +32,21 @@ class OxiPNGStrategy:
         quality: int,
         cancel_event: threading.Event | None = None,
     ) -> tuple[int, int]:
-        import oxipng
         before = os.path.getsize(filepath)
-        
-        # Mapping UI speed (2: Fast, 3: Standard, 9: Max) to pyoxipng level (0-6)
+
+        # Mapping UI speed (2: Fast, 3: Standard, 9: Max) to pyoxipng level
         level = 6 if self.speed == 9 else self.speed
-        
+
         try:
-            oxipng.optimize(filepath, output_path, level=level, strip=oxipng.StripChunks.safe())
+            oxipng.optimize(
+                filepath,
+                output_path,
+                level=level,
+                strip=oxipng.StripChunks.safe(),
+            )
         except Exception as e:
             raise RuntimeError(f"oxipng failed: {e}")
-            
+
         after = os.path.getsize(output_path)
         return before, after
 
