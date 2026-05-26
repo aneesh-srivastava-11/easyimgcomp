@@ -32,17 +32,22 @@ yay -S easyimgcomp-git
 ```bash
 git clone https://github.com/YOUR_USERNAME/easyimgcomp
 cd easyimgcomp
+
+# Create a virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+# Install requirements
 pip install -r requirements.txt
+
+# Run the app
 python main.py
 ```
-
-You will also need `oxipng` on your `PATH`:
-
-| Distro | Command |
-|--------|---------|
-| Arch | `pacman -S oxipng` |
-| Ubuntu / Debian | `apt install oxipng` |
-| Fedora | `dnf install oxipng` |
 
 ## Requirements
 
@@ -51,7 +56,7 @@ You will also need `oxipng` on your `PATH`:
 | Python 3.9+ | Runtime |
 | PySide6 | GUI framework (Qt 6) |
 | Pillow | WebP and JPEG encoding |
-| oxipng | Lossless PNG compression (CLI tool, must be on PATH) |
+| pyoxipng | Lossless PNG compression (Rust oxipng Python bindings) |
 
 ## Usage
 

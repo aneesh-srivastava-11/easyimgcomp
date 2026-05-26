@@ -20,13 +20,9 @@ class OutputBehavior(Enum):
 
 def _oxipng_available() -> bool:
     try:
-        subprocess.run(
-            ["oxipng", "--version"],
-            capture_output=True,
-            check=True,
-        )
+        import oxipng
         return True
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except ImportError:
         return False
 
 
@@ -41,22 +37,18 @@ class OxiPNGStrategy:
         quality: int,
         cancel_event: threading.Event | None = None,
     ) -> tuple[int, int]:
+        import oxipng
         before = os.path.getsize(filepath)
-        speed_str = str(self.speed) if self.speed != 9 else "max"
-        proc = subprocess.Popen(
-            ["oxipng", "-o", speed_str, "--strip", "safe", filepath],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        while proc.poll() is None:
-            if cancel_event and cancel_event.is_set():
-                proc.kill()
-                proc.wait()
-                raise RuntimeError("Cancelled")
-            time.sleep(0.1)
-        if proc.returncode != 0:
-            raise RuntimeError(f"oxipng exited with code {proc.returncode}")
-        after = os.path.getsize(filepath)
+        
+        # Mapping UI speed (2: Fast, 3: Standard, 9: Max) to pyoxipng level (0-6)
+        level = 6 if self.speed == 9 else self.speed
+        
+        try:
+            oxipng.optimize(filepath, output_path, level=level, strip=oxipng.StripChunks.safe())
+        except Exception as e:
+            raise RuntimeError(f"oxipng failed: {e}")
+            
+        after = os.path.getsize(output_path)
         return before, after
 
     def needs_quality(self) -> bool:

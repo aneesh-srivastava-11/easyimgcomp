@@ -118,11 +118,19 @@ class CompressionThread(QThread):
         out = base + ext
         should_delete = self.output_behavior == OutputBehavior.REPLACE
 
-        if self.output_behavior == OutputBehavior.INPLACE_NEW_EXT and ext != os.path.splitext(filepath)[1]:
-            counter = 1
-            while os.path.exists(out):
-                out = f"{base}_{counter:02d}{ext}"
-                counter += 1
+        if self.output_behavior == OutputBehavior.INPLACE_NEW_EXT:
+            orig_ext = os.path.splitext(filepath)[1]
+            if ext.lower() != orig_ext.lower():
+                counter = 1
+                while os.path.exists(out):
+                    out = f"{base}_{counter:02d}{ext}"
+                    counter += 1
+            else:
+                counter = 1
+                out = f"{base}_optimized{ext}"
+                while os.path.exists(out):
+                    out = f"{base}_optimized_{counter:02d}{ext}"
+                    counter += 1
 
         return out, should_delete
 

@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
         self._thread = None
 
     def _on_mode_changed(self, mode: Mode):
-        self.output_selector.setVisible(mode != Mode.LOSSLESS_PNG)
+        self.output_selector.setVisible(True)
 
     def start_compression(self):
         folders = self.folder_list.folders()
@@ -55,7 +55,6 @@ class MainWindow(QMainWindow):
 
         if (
             behavior == OutputBehavior.CUSTOM_FOLDER
-            and mode != Mode.LOSSLESS_PNG
             and not custom_folder
         ):
             QMessageBox.warning(
