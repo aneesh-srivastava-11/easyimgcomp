@@ -1,6 +1,6 @@
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
 from dataclasses import dataclass
 
 from PySide6.QtCore import QThread, Signal
@@ -66,7 +66,9 @@ class CompressionThread(QThread):
             for filepath in files:
                 if self._cancel_event.is_set():
                     break
-                output_path, should_delete = self._resolve_output(filepath, strategy)
+                output_path, should_delete = self._resolve_output(
+                    filepath, strategy
+                )
                 futures[
                     executor.submit(
                         self._process_one,
@@ -79,7 +81,15 @@ class CompressionThread(QThread):
                 ] = filepath
 
             for future in as_completed(futures):
-                result = future.result()
+                try:
+                    result = future.result()
+                except CancelledError:
+                    if self._cancel_event.is_set():
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        self.cancelled.emit()
+                        return
+                    continue
+
                 completed += 1
                 self.progress.emit(
                     completed, total, os.path.basename(result.filepath)
@@ -103,13 +113,17 @@ class CompressionThread(QThread):
         base, _ = os.path.splitext(filepath)
         ext = strategy.output_extension()
 
-        if self.output_behavior == OutputBehavior.CUSTOM_FOLDER and self.output_dir:
-            rel = os.path.relpath(
-                filepath,
-                os.path.commonpath(self.folders)
-                if self.folders
-                else os.path.dirname(filepath),
-            )
+        if (
+            self.output_behavior == OutputBehavior.CUSTOM_FOLDER
+            and self.output_dir
+        ):
+            dirs = [f if os.path.isdir(f) else os.path.dirname(f) for f in self.folders]
+            try:
+                common = os.path.commonpath(dirs) if dirs else os.path.dirname(filepath)
+                rel = os.path.relpath(filepath, common)
+            except ValueError:
+                common = os.path.dirname(filepath)
+                rel = os.path.relpath(filepath, common)
             rel_base, _ = os.path.splitext(rel)
             out = os.path.join(self.output_dir, rel_base + ext)
             os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -118,11 +132,19 @@ class CompressionThread(QThread):
         out = base + ext
         should_delete = self.output_behavior == OutputBehavior.REPLACE
 
-        if self.output_behavior == OutputBehavior.INPLACE_NEW_EXT and ext != os.path.splitext(filepath)[1]:
-            counter = 1
-            while os.path.exists(out):
-                out = f"{base}_{counter:02d}{ext}"
-                counter += 1
+        if self.output_behavior == OutputBehavior.INPLACE_NEW_EXT:
+            orig_ext = os.path.splitext(filepath)[1]
+            if ext.lower() != orig_ext.lower():
+                counter = 1
+                while os.path.exists(out):
+                    out = f"{base}_{counter:02d}{ext}"
+                    counter += 1
+            else:
+                counter = 1
+                out = f"{base}_optimized{ext}"
+                while os.path.exists(out):
+                    out = f"{base}_optimized_{counter:02d}{ext}"
+                    counter += 1
 
         return out, should_delete
 
@@ -145,5 +167,9 @@ class CompressionThread(QThread):
             )
         except Exception as e:
             return FileResult(
-                filepath=filepath, before=0, after=0, success=False, error=str(e)
+                filepath=filepath,
+                before=0,
+                after=0,
+                success=False,
+                error=str(e),
             )

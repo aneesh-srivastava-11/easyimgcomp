@@ -43,7 +43,7 @@ class ResultsPanel(QWidget):
 
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setToolTip("Stop after the current file finishes.")
-        self.cancel_btn.clicked.connect(self.cancel_clicked)
+        self.cancel_btn.clicked.connect(self._on_cancel_clicked)
         self.cancel_btn.hide()
 
         btn_row.addWidget(self.run_btn)
@@ -84,6 +84,11 @@ class ResultsPanel(QWidget):
         elapsed = time.monotonic() - self._start_time
         self.elapsed_label.setText(f"Elapsed: {_elapsed_str(elapsed)}")
 
+    def _on_cancel_clicked(self):
+        self.cancel_btn.setEnabled(False)
+        self.cancel_btn.setText("Cancelling...")
+        self.cancel_clicked.emit()
+
     def set_progress(self, current: int, total: int, filename: str):
         self.progress_bar.setMaximum(total)
         self.progress_bar.setValue(current)
@@ -95,6 +100,8 @@ class ResultsPanel(QWidget):
 
     def show_busy(self):
         self.run_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setText("Cancel")
         self.cancel_btn.show()
         self.progress_bar.show()
         self.progress_label.show()
@@ -105,6 +112,8 @@ class ResultsPanel(QWidget):
     def show_idle(self):
         self.run_btn.setEnabled(True)
         self.cancel_btn.hide()
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setText("Cancel")
         self.progress_bar.hide()
         self.progress_label.hide()
         self._timer.stop()

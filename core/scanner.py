@@ -11,6 +11,11 @@ def scan_folders(
 
     for folder in folders:
         folder = os.path.abspath(folder)
+        if os.path.isfile(folder):
+            if os.path.splitext(folder)[1].lower() in exts:
+                files.append(folder)
+            continue
+
         if not os.path.isdir(folder):
             continue
 
@@ -25,4 +30,5 @@ def scan_folders(
                 if os.path.isfile(fpath) and os.path.splitext(fname)[1].lower() in exts:
                     files.append(fpath)
 
-    return sorted(files)
+    return sorted(list(set(files)))
+
