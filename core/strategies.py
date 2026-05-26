@@ -2,7 +2,13 @@ import os
 import threading
 from enum import Enum
 from PIL import Image
-import oxipng
+
+try:
+    import oxipng
+    HAS_OXIPNG = hasattr(oxipng, "optimize")
+except ImportError:
+    oxipng = None
+    HAS_OXIPNG = False
 
 
 class Mode(Enum):
@@ -18,7 +24,7 @@ class OutputBehavior(Enum):
 
 
 def _oxipng_available() -> bool:
-    return hasattr(oxipng, "optimize")
+    return HAS_OXIPNG
 
 
 class OxiPNGStrategy:
@@ -32,6 +38,8 @@ class OxiPNGStrategy:
         quality: int,
         cancel_event: threading.Event | None = None,
     ) -> tuple[int, int]:
+        if not HAS_OXIPNG:
+            raise RuntimeError("oxipng is not installed or available on this system.")
         before = os.path.getsize(filepath)
 
         # Mapping UI speed (2: Fast, 3: Standard, 9: Max) to pyoxipng level
@@ -88,8 +96,20 @@ class WebPStrategy:
         cancel_event: threading.Event | None = None,
     ) -> tuple[int, int]:
         before = os.path.getsize(filepath)
-        img = Image.open(filepath)
-        img.save(output_path, "WEBP", quality=quality)
+        # Use context manager to release file handle immediately, avoiding Windows file locking.
+        with Image.open(filepath) as img:
+            img.load()  # Force load pixel data to prevent lazy-loading file read/write collision.
+            if os.path.abspath(filepath) == os.path.abspath(output_path):
+                temp_path = output_path + ".tmp"
+                try:
+                    img.save(temp_path, "WEBP", quality=quality)
+                    os.replace(temp_path, output_path)
+                except Exception as e:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    raise e
+            else:
+                img.save(output_path, "WEBP", quality=quality)
         after = os.path.getsize(output_path)
         return before, after
 
@@ -122,10 +142,21 @@ class JPEGStrategy:
         cancel_event: threading.Event | None = None,
     ) -> tuple[int, int]:
         before = os.path.getsize(filepath)
-        img = Image.open(filepath)
-        if img.mode in ("RGBA", "P", "LA"):
-            img = img.convert("RGB")
-        img.save(output_path, "JPEG", quality=quality)
+        with Image.open(filepath) as img:
+            img.load()
+            if img.mode in ("RGBA", "P", "LA"):
+                img = img.convert("RGB")
+            if os.path.abspath(filepath) == os.path.abspath(output_path):
+                temp_path = output_path + ".tmp"
+                try:
+                    img.save(temp_path, "JPEG", quality=quality)
+                    os.replace(temp_path, output_path)
+                except Exception as e:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    raise e
+            else:
+                img.save(output_path, "JPEG", quality=quality)
         after = os.path.getsize(output_path)
         return before, after
 

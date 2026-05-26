@@ -1,3 +1,4 @@
+import os
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QMessageBox
 
 from core.compressor import CompressionThread, FileResult
@@ -42,7 +43,7 @@ class MainWindow(QMainWindow):
         folders = self.folder_list.folders()
         if not folders:
             QMessageBox.warning(
-                self, "No folders", "Add at least one folder first."
+                self, "No input", "Add at least one folder or file first."
             )
             return
 
@@ -93,6 +94,22 @@ class MainWindow(QMainWindow):
     def _on_finished(self):
         self.results_panel.show_results(self._results, cancelled=False)
         self.folder_list.clear_all()
+        
+        failures = [r for r in self._results if not r.success]
+        if failures:
+            error_details = "\n".join(
+                f"• {os.path.basename(r.filepath)}: {r.error}"
+                for r in failures[:10]
+            )
+            if len(failures) > 10:
+                error_details += f"\n... and {len(failures) - 10} more files."
+            
+            QMessageBox.warning(
+                self,
+                "Compression Warnings",
+                f"{len(failures)} file(s) failed to compress:\n\n{error_details}"
+            )
+            
         self._thread = None
 
     def _on_cancelled(self):

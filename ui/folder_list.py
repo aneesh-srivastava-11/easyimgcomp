@@ -1,5 +1,6 @@
 import os
 from urllib.parse import urlparse, unquote
+from urllib.request import url2pathname
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -24,10 +25,15 @@ def _parse_paths(text: str) -> list[str]:
         line = line.strip()
         if not line:
             continue
+        # Strip leading/trailing double or single quotes (common in "Copy as path")
+        if (line.startswith('"') and line.endswith('"')) or (line.startswith("'") and line.endswith("'")):
+            line = line[1:-1].strip()
+        if not line:
+            continue
         if line.startswith("file://"):
             parsed = urlparse(line)
-            line = unquote(parsed.path)
-        if os.path.isdir(line):
+            line = url2pathname(parsed.path)
+        if os.path.isdir(line) or os.path.isfile(line):
             paths.append(line)
     return paths
 
@@ -40,8 +46,8 @@ class DropListWidget(QListWidget):
         self.setAcceptDrops(True)
         self.setDragDropMode(QListWidget.InternalMove)
         self.setToolTip(
-            "Add folders containing images to compress.\n"
-            "You can also drag and drop folders from your file manager."
+            "Add folders containing images, or individual images to compress.\n"
+            "You can also drag and drop folders/files from your file manager."
         )
 
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -54,7 +60,7 @@ class DropListWidget(QListWidget):
         if event.mimeData().hasUrls():
             for url in event.mimeData().urls():
                 path = url.toLocalFile()
-                if os.path.isdir(path):
+                if os.path.isdir(path) or os.path.isfile(path):
                     self.folder_dropped.emit(path)
         elif event.mimeData().hasText():
             for path in _parse_paths(event.mimeData().text()):
@@ -79,7 +85,7 @@ class FolderListWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         label_layout = QHBoxLayout()
-        title = QPushButton("Folders to process")
+        title = QPushButton("Folders/Files to process")
         title.setFlat(True)
         title.setEnabled(False)
         label_layout.addWidget(title)
@@ -88,7 +94,7 @@ class FolderListWidget(QWidget):
         self.list_widget = DropListWidget()
         self.list_widget.folder_dropped.connect(self._on_folder_dropped)
 
-        self.hint_label = QLabel("Drop folders here or Ctrl+V to paste paths")
+        self.hint_label = QLabel("Drop folders/images here or Ctrl+V to paste paths")
         self.hint_label.setAlignment(Qt.AlignCenter)
         self.hint_label.setStyleSheet("color: #666; padding: 12px;")
         self.hint_label.setWordWrap(True)
@@ -98,9 +104,13 @@ class FolderListWidget(QWidget):
         self.add_btn.setToolTip("Open a file picker to select a folder.")
         self.add_btn.clicked.connect(self.add_folder)
 
+        self.add_file_btn = QPushButton("Add File")
+        self.add_file_btn.setToolTip("Open a file picker to select individual images.")
+        self.add_file_btn.clicked.connect(self.add_file)
+
         self.remove_btn = QPushButton("Remove Selected")
         self.remove_btn.setToolTip(
-            "Remove the currently selected folder from the list."
+            "Remove the currently selected folder/file from the list."
         )
         self.remove_btn.clicked.connect(self.remove_selected)
 
@@ -112,6 +122,7 @@ class FolderListWidget(QWidget):
         )
 
         btn_layout.addWidget(self.add_btn)
+        btn_layout.addWidget(self.add_file_btn)
         btn_layout.addWidget(self.remove_btn)
         btn_layout.addStretch()
         btn_layout.addWidget(self.recursive_cb)
@@ -131,7 +142,7 @@ class FolderListWidget(QWidget):
         if event.mimeData().hasUrls():
             for url in event.mimeData().urls():
                 path = url.toLocalFile()
-                if os.path.isdir(path):
+                if os.path.isdir(path) or os.path.isfile(path):
                     self._on_folder_dropped(path)
         elif event.mimeData().hasText():
             for path in _parse_paths(event.mimeData().text()):
@@ -161,6 +172,18 @@ class FolderListWidget(QWidget):
         self.list_widget.addItem(folder)
         self._update_hint()
         self.folders_changed.emit(self.folders())
+
+    def add_file(self):
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select Images",
+            "",
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tiff *.tif);;All Files (*)"
+        )
+        if not files:
+            return
+        for file in files:
+            self._on_folder_dropped(file)
 
     def remove_selected(self):
         for item in self.list_widget.selectedItems():

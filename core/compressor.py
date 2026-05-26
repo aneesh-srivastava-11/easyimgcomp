@@ -1,6 +1,6 @@
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
 from dataclasses import dataclass
 
 from PySide6.QtCore import QThread, Signal
@@ -81,7 +81,15 @@ class CompressionThread(QThread):
                 ] = filepath
 
             for future in as_completed(futures):
-                result = future.result()
+                try:
+                    result = future.result()
+                except CancelledError:
+                    if self._cancel_event.is_set():
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        self.cancelled.emit()
+                        return
+                    continue
+
                 completed += 1
                 self.progress.emit(
                     completed, total, os.path.basename(result.filepath)
@@ -109,12 +117,13 @@ class CompressionThread(QThread):
             self.output_behavior == OutputBehavior.CUSTOM_FOLDER
             and self.output_dir
         ):
-            rel = os.path.relpath(
-                filepath,
-                os.path.commonpath(self.folders)
-                if self.folders
-                else os.path.dirname(filepath),
-            )
+            dirs = [f if os.path.isdir(f) else os.path.dirname(f) for f in self.folders]
+            try:
+                common = os.path.commonpath(dirs) if dirs else os.path.dirname(filepath)
+                rel = os.path.relpath(filepath, common)
+            except ValueError:
+                common = os.path.dirname(filepath)
+                rel = os.path.relpath(filepath, common)
             rel_base, _ = os.path.splitext(rel)
             out = os.path.join(self.output_dir, rel_base + ext)
             os.makedirs(os.path.dirname(out), exist_ok=True)
