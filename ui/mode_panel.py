@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QButtonGroup,
     QComboBox,
+    QCheckBox,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -103,7 +104,13 @@ class ModePanel(QWidget):
         quality_row.addStretch()
         layout.addLayout(quality_row)
 
-        self.quality_slider.valueChanged.connect(self._on_quality_changed)
+        self.webp_rename_cb = QCheckBox("Rename .webp to .jpg (compatibility)")
+        self.webp_rename_cb.setToolTip(
+            "Keep WebP compression but use a .jpg extension.\n"
+            "Tricks apps that reject .webp even though\n"
+            "they can decode it (e.g. Reddit, some chat apps)."
+        )
+        layout.addWidget(self.webp_rename_cb)
 
         speed_row = QHBoxLayout()
         speed_row.addWidget(QLabel("Speed:"))
@@ -132,6 +139,7 @@ class ModePanel(QWidget):
     def _on_mode_toggled(self):
         current = self.selected_mode()
         is_lossless = current == Mode.LOSSLESS_PNG
+        is_webp = current == Mode.WEBP
         self.quality_slider.setVisible(not is_lossless)
         if is_lossless:
             self.quality_label.setText("Lossless (100%)")
@@ -143,6 +151,7 @@ class ModePanel(QWidget):
         for w in self._speed_row_widgets:
             w.setVisible(is_lossless)
         self.png_notice.setVisible(is_lossless)
+        self.webp_rename_cb.setVisible(is_webp)
         self.mode_changed.emit(current)
 
     def _on_quality_changed(self, v: int):
@@ -160,3 +169,6 @@ class ModePanel(QWidget):
 
     def oxipng_speed(self) -> int:
         return self.speed_combo.currentData()
+
+    def webp_rename_to_jpg(self) -> bool:
+        return self.webp_rename_cb.isChecked()
